@@ -2,6 +2,9 @@
 # Scripts base for this repo: without it the engine looks for install/ and the in-container
 # `update` command in community-scripts/ProxmoxVE. Drop this line if contributed upstream.
 export COMMUNITY_SCRIPTS_URL="${COMMUNITY_SCRIPTS_URL:-https://raw.githubusercontent.com/thekannen/foundry-ops/main}"
+# Engine pinned to a tested commit: every run executes it as root, and its main branch
+# changes without notice. Bump deliberately after a test install and update.
+export COMMUNITY_SCRIPTS_CORE_URL="${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/9c759bec093dffe4f07e6b4189bd5e9531954bf3}"
 _cs_boot="${COMMUNITY_SCRIPTS_CORE_DIR:-$(dirname "${BASH_SOURCE[0]}")/../../core}/core/build.func"
 source "$_cs_boot" 2>/dev/null || source <(curl -fsSL "${COMMUNITY_SCRIPTS_CORE_URL:-https://raw.githubusercontent.com/community-scripts/core/main}/core/build.func")
 # Copyright (c) 2026 Aaron Kannengieser
@@ -222,6 +225,20 @@ function update_script() {
 start
 build_container
 description
+
+# The engine brands every container as an official community-scripts one (notes, tag,
+# login banner). This script is not one of theirs: point people here instead.
+# Drop this block if the script is ever accepted upstream.
+msg_info "Setting foundry-ops attribution"
+pct set "$CTID" --description "<div align='center'>
+<h2>Foundry VTT LXC</h2>
+<p>Installed by <a href='https://github.com/thekannen/foundry-ops'>foundry-ops</a>, using the community-scripts engine.<br>
+Not an official community-scripts script: report problems at
+<a href='https://github.com/thekannen/foundry-ops/issues'>github.com/thekannen/foundry-ops/issues</a>.</p>
+</div>"
+pct set "$CTID" --tags "$(pct config "$CTID" | awk '/^tags:/ {print $2}' | tr ';' '\n' | grep -vx 'community-script' | paste -sd ';' -)"
+pct exec "$CTID" -- sed -i 's#community-scripts ORG \(.*\)https://github.com/community-scripts/ProxmoxVE#foundry-ops \1https://github.com/thekannen/foundry-ops#' /etc/profile.d/00_lxc-details.sh
+msg_ok "Set foundry-ops attribution"
 
 msg_ok "Completed successfully!\n"
 echo -e "${CREATING}${GN}${APP} setup has been successfully initialized!${CL}"
