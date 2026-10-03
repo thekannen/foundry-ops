@@ -138,7 +138,8 @@ node_for_generation() {
 wait_for_foundry() {
   local _
   for _ in {1..60}; do
-    if curl -fsS -o /dev/null http://127.0.0.1:30000; then
+    # -s without -S: "connection refused" is expected until Foundry listens.
+    if curl -fs -o /dev/null http://127.0.0.1:30000; then
       return 0
     fi
     sleep 1
