@@ -10,18 +10,11 @@ restore, staging clones and upgrade tooling follow (see [Roadmap](#roadmap)).
 > own [Purchased Licenses](https://foundryvtt.com/me/licenses) page and download your copy
 > directly into your container. You need a Foundry license to use this.
 
+> [!WARNING]
+> Early and lightly tested: Foundry 14.368 (Linux package) on Proxmox VE 9 so far. Back up
+> before pointing it at a server you care about.
+
 ## Install (Proxmox VE host shell)
-
-While the repo is private, copy it to a node and run the CT script from the checkout. The
-community-scripts engine finds `install/` next to `ct/` on its own:
-
-```bash
-scp -r ~/Repos/foundry-ops root@<node>:/root/
-ssh root@<node>
-bash /root/foundry-ops/ct/foundryvtt.sh
-```
-
-Once public, the usual one-liner works:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/thekannen/foundry-ops/main/ct/foundryvtt.sh)"
@@ -44,16 +37,31 @@ The script creates the container (defaults: Debian 13, unprivileged, 2 cores, 4 
 
 Open `http://<container-ip>:30000` and enter your license key.
 
-## Update
+### Without prompts (Ansible, scripts)
 
-Inside the container, run `update` (once public), or while private, from the node:
+Every question has an environment variable, and the community-scripts engine takes
+`mode=default` plus `var_*` settings (`var_ctid`, `var_hostname`, `var_container_storage`,
+`var_vlan`, …):
+
+| Variable | Meaning |
+|---|---|
+| `FOUNDRY_SOURCE` | Timed URL, or path to a Foundry zip **inside the container**. Required without a terminal. |
+| `FOUNDRY_PROXY` | `yes` / `no` (default `no` without a terminal) |
+| `FOUNDRY_HOSTNAME` | Hostname for invite links, behind a proxy |
+| `FOUNDRY_BACKUP` | Updates only: `yes` / `no` to archive user data first (default `yes`) |
 
 ```bash
-pct push <ctid> /root/foundry-ops/ct/foundryvtt.sh /root/foundryvtt.sh
-lxc-attach -n <ctid> -- bash /root/foundryvtt.sh
+TERM=xterm mode=default var_ctid=150 var_hostname=foundry \
+  FOUNDRY_SOURCE='<timed url>' FOUNDRY_PROXY=no \
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/thekannen/foundry-ops/main/ct/foundryvtt.sh)"
 ```
 
-It asks for a new Timed URL, optionally archives `Data/` and `Config/` to
+A Timed URL lives 5 minutes and is used after the container is created and updated, so
+fetch it right before running.
+
+## Update
+
+Inside the container, run `update`. It asks for a new Timed URL, optionally archives `Data/` and `Config/` to
 `/var/backups/foundryvtt`, swaps the app, matches Node.js, and keeps the previous version in
 `/opt/foundryvtt/app.prev`. Back up the container (vzdump/PBS) first: a newer Foundry
 migrates worlds when it opens them, and that does not roll back.
@@ -97,9 +105,14 @@ but `proxySSL`/`hostname` come across as they were.
   parameterised for this layout.
 - Optional Caddy in the container for setups without a reverse proxy (wiki section C13+).
 - Test matrix: v12, v13, v14 Node packages; fresh install and update.
-- Public release, then decide on contributing upstream to community-scripts.
+- Decide on contributing upstream to community-scripts.
 
 See [docs/design.md](docs/design.md) for the decisions behind this.
+
+## Contributing and security
+
+Issues and pull requests are welcome. Never attach Foundry files or download links to them;
+CI rejects both. Report security problems privately: see [SECURITY.md](SECURITY.md).
 
 ## License
 

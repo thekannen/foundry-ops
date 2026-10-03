@@ -29,16 +29,25 @@ ZIP_FILE="$APP_DIR/.foundryvtt.zip"
 # so the functions are duplicated: keep both copies in sync.
 # ---------------------------------------------------------------------------
 
-# Ask for a Timed URL (or a zip already in the container) and fetch it to $1.
-# The prompt comes right before the download: Timed URLs expire after 5 minutes.
+# Fetch Foundry to $1 from FOUNDRY_SOURCE, or from a Timed URL / zip path typed at
+# the prompt. The prompt comes right before the download: Timed URLs expire after 5
+# minutes. Without a terminal (Ansible, CI), FOUNDRY_SOURCE is required.
 fetch_foundry() {
-  local dest="$1" src
-  echo -e "${TAB3}Foundry VTT is licensed software, so this downloads your own copy."
-  echo -e "${TAB3}foundryvtt.com -> Purchased Licenses -> choose the ${BGN}Node.js${CL} package -> ${BGN}Timed URL${CL}."
-  echo -e "${TAB3}The link is valid for 5 minutes. A path to a zip inside this container also works."
+  local dest="$1" src="${FOUNDRY_SOURCE:-}"
+  if [[ -z "$src" && ! -t 0 ]]; then
+    msg_error "No terminal to ask on: set FOUNDRY_SOURCE to a Timed URL or a zip path inside the container."
+    return 1
+  fi
+  if [[ -z "$src" ]]; then
+    echo -e "${TAB3}Foundry VTT is licensed software, so this downloads your own copy."
+    echo -e "${TAB3}foundryvtt.com -> Purchased Licenses -> choose the ${BGN}Node.js${CL} package -> ${BGN}Timed URL${CL}."
+    echo -e "${TAB3}The link is valid for 5 minutes. A path to a zip inside this container also works."
+  fi
   while true; do
-    read -r -p "${TAB3}Timed URL or zip path: " src
-    if [[ "$src" =~ ^https://[^[:space:]\"]+$ ]]; then
+    if [[ -z "$src" ]]; then
+      read -r -p "${TAB3}Timed URL or zip path: " src
+    fi
+    if [[ "$src" =~ ^https?://[^[:space:]\"]+$ ]]; then
       msg_info "Downloading Foundry VTT"
       # URL via stdin, not argv: it is a credential for its 5-minute life.
       if printf 'url = "%s"\n' "$src" | curl -fsSL --retry 3 --config - -o "$dest"; then
@@ -49,10 +58,16 @@ fetch_foundry() {
       msg_error "Download failed. Timed URLs expire after 5 minutes: copy a fresh one."
     elif [[ -f "$src" ]]; then
       cp "$src" "$dest"
+      msg_ok "Using Foundry VTT zip ${src}"
       return 0
     else
-      msg_error "Not an https:// URL or an existing file."
+      msg_error "Not an http(s):// URL or an existing file."
     fi
+    # A bad FOUNDRY_SOURCE cannot be corrected without a terminal.
+    if [[ -n "${FOUNDRY_SOURCE:-}" || ! -t 0 ]]; then
+      return 1
+    fi
+    src=""
   done
 }
 
@@ -138,16 +153,24 @@ msg_info "Installing Dependencies"
 $STD apt install -y unzip jq
 msg_ok "Installed Dependencies"
 
-BEHIND_PROXY=no
-FVTT_HOSTNAME=""
-read -r -p "${TAB3}Will players reach Foundry through an HTTPS reverse proxy (NPM, Caddy, Traefik)? <y/N> " prompt
-if [[ "${prompt,,}" =~ ^(y|yes)$ ]]; then
+# FOUNDRY_PROXY (yes/no) and FOUNDRY_HOSTNAME skip these questions; without a
+# terminal they default to no proxy.
+BEHIND_PROXY="${FOUNDRY_PROXY:-}"
+FVTT_HOSTNAME="${FOUNDRY_HOSTNAME:-}"
+if [[ -z "$BEHIND_PROXY" && -t 0 ]]; then
+  read -r -p "${TAB3}Will players reach Foundry through an HTTPS reverse proxy (NPM, Caddy, Traefik)? <y/N> " BEHIND_PROXY
+  if [[ "${BEHIND_PROXY,,}" =~ ^(y|yes)$ && -z "$FVTT_HOSTNAME" ]]; then
+    read -r -p "${TAB3}Public hostname for invite links (e.g. vtt.example.com, blank to skip): " FVTT_HOSTNAME
+  fi
+fi
+if [[ "${BEHIND_PROXY,,}" =~ ^(y|yes)$ ]]; then
   BEHIND_PROXY=yes
-  read -r -p "${TAB3}Public hostname for invite links (e.g. vtt.example.com, blank to skip): " FVTT_HOSTNAME
+else
+  BEHIND_PROXY=no
 fi
 
 mkdir -p "$APP_DIR"
-fetch_foundry "$ZIP_FILE"
+fetch_foundry "$ZIP_FILE" || exit 1
 stage_foundry "$ZIP_FILE" "$STAGING_DIR" || exit 1
 
 NODE_VERSION="$FVTT_NODE" setup_nodejs

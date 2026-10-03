@@ -1,6 +1,6 @@
 # foundry-ops
 
-Proxmox tooling for self-hosting Foundry VTT. Private for now; will go public.
+Proxmox tooling for self-hosting Foundry VTT. Public repo: everything committed is published.
 
 ## Hard rule
 
@@ -19,5 +19,5 @@ the user's own Timed URL at run time and delete the download after installing.
   `foundryvtt`, user `foundry`.
 - Test on a throwaway CT on a Proxmox node before merging; record which Foundry versions
   were tested in the PR.
-- Related: `~/Repos/proxmox-iac` (the owner's homelab IaC) and
-  `~/Repos/Home-Scripts/scripts/bash/foundry` (the pm2-based scripts this replaces).
+- Never commit homelab specifics (IPs, tailnet names, hostnames, VM IDs); keep them in the
+  owner's private repos.

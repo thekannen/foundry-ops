@@ -1,18 +1,27 @@
 name: guard
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Read-only by default; no job needs to write.
+permissions:
+  contents: read
 
 jobs:
   no-foundry-files:
     # Foundry VTT is licensed software: fail if anything that looks like it is committed.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Reject archives and Foundry app files
         run: |
           bad=$(git ls-files | grep -Ei '\.(zip|tar|tgz|gz|zst|7z)$|(^|/)(resources/app|node_modules)/|(^|/)main\.js$' || true)
           if [ -n "$bad" ]; then echo "Not allowed in this repo:"; echo "$bad"; exit 1; fi
-      - name: Reject Timed URLs
+      - name: Reject download links
         run: |
           if git grep -nEi 'foundryvtt\.com/[^ ]*(releases|download)[^ ]*\?' -- . ':!.github'; then
             echo "Looks like a Foundry download link. Never commit one."; exit 1
@@ -21,5 +30,7 @@ jobs:
   shellcheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - run: shellcheck ct/*.sh install/*.sh

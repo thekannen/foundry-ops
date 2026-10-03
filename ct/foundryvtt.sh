@@ -38,16 +38,25 @@ BACKUP_DIR=/var/backups/foundryvtt
 # so the functions are duplicated: keep both copies in sync.
 # ---------------------------------------------------------------------------
 
-# Ask for a Timed URL (or a zip already in the container) and fetch it to $1.
-# The prompt comes right before the download: Timed URLs expire after 5 minutes.
+# Fetch Foundry to $1 from FOUNDRY_SOURCE, or from a Timed URL / zip path typed at
+# the prompt. The prompt comes right before the download: Timed URLs expire after 5
+# minutes. Without a terminal (Ansible, CI), FOUNDRY_SOURCE is required.
 fetch_foundry() {
-  local dest="$1" src
-  echo -e "${TAB3}Foundry VTT is licensed software, so this downloads your own copy."
-  echo -e "${TAB3}foundryvtt.com -> Purchased Licenses -> choose the ${BGN}Node.js${CL} package -> ${BGN}Timed URL${CL}."
-  echo -e "${TAB3}The link is valid for 5 minutes. A path to a zip inside this container also works."
+  local dest="$1" src="${FOUNDRY_SOURCE:-}"
+  if [[ -z "$src" && ! -t 0 ]]; then
+    msg_error "No terminal to ask on: set FOUNDRY_SOURCE to a Timed URL or a zip path inside the container."
+    return 1
+  fi
+  if [[ -z "$src" ]]; then
+    echo -e "${TAB3}Foundry VTT is licensed software, so this downloads your own copy."
+    echo -e "${TAB3}foundryvtt.com -> Purchased Licenses -> choose the ${BGN}Node.js${CL} package -> ${BGN}Timed URL${CL}."
+    echo -e "${TAB3}The link is valid for 5 minutes. A path to a zip inside this container also works."
+  fi
   while true; do
-    read -r -p "${TAB3}Timed URL or zip path: " src
-    if [[ "$src" =~ ^https://[^[:space:]\"]+$ ]]; then
+    if [[ -z "$src" ]]; then
+      read -r -p "${TAB3}Timed URL or zip path: " src
+    fi
+    if [[ "$src" =~ ^https?://[^[:space:]\"]+$ ]]; then
       msg_info "Downloading Foundry VTT"
       # URL via stdin, not argv: it is a credential for its 5-minute life.
       if printf 'url = "%s"\n' "$src" | curl -fsSL --retry 3 --config - -o "$dest"; then
@@ -58,10 +67,16 @@ fetch_foundry() {
       msg_error "Download failed. Timed URLs expire after 5 minutes: copy a fresh one."
     elif [[ -f "$src" ]]; then
       cp "$src" "$dest"
+      msg_ok "Using Foundry VTT zip ${src}"
       return 0
     else
-      msg_error "Not an https:// URL or an existing file."
+      msg_error "Not an http(s):// URL or an existing file."
     fi
+    # A bad FOUNDRY_SOURCE cannot be corrected without a terminal.
+    if [[ -n "${FOUNDRY_SOURCE:-}" || ! -t 0 ]]; then
+      return 1
+    fi
+    src=""
   done
 }
 
@@ -155,14 +170,19 @@ function update_script() {
   echo -e "${TAB3}Installed: Foundry VTT $(cat "$APP_DIR/version" 2>/dev/null || echo unknown)"
   msg_warn "A newer Foundry migrates worlds, systems and modules when it opens them. Back up the container (vzdump/PBS) first."
 
-  local backup_data=yes prompt
-  read -r -p "${TAB3}Also archive user data ($(du -sh "$DATA_DIR" 2>/dev/null | cut -f1)) to ${BACKUP_DIR}? <Y/n> " prompt
-  if [[ "${prompt,,}" =~ ^(n|no)$ ]]; then
+  # FOUNDRY_BACKUP (yes/no) skips this question; without a terminal it defaults to yes.
+  local backup_data="${FOUNDRY_BACKUP:-}"
+  if [[ -z "$backup_data" && -t 0 ]]; then
+    read -r -p "${TAB3}Also archive user data ($(du -sh "$DATA_DIR" 2>/dev/null | cut -f1)) to ${BACKUP_DIR}? <Y/n> " backup_data
+  fi
+  if [[ "${backup_data,,}" =~ ^(n|no)$ ]]; then
     backup_data=no
+  else
+    backup_data=yes
   fi
 
   ensure_dependencies unzip jq
-  fetch_foundry "$ZIP_FILE"
+  fetch_foundry "$ZIP_FILE" || exit 1
   stage_foundry "$ZIP_FILE" "$STAGING_DIR" || exit 1
 
   NODE_VERSION="$FVTT_NODE" setup_nodejs
