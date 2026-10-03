@@ -1,0 +1,25 @@
+name: guard
+
+on: [push, pull_request]
+
+jobs:
+  no-foundry-files:
+    # Foundry VTT is licensed software: fail if anything that looks like it is committed.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reject archives and Foundry app files
+        run: |
+          bad=$(git ls-files | grep -Ei '\.(zip|tar|tgz|gz|zst|7z)$|(^|/)(resources/app|node_modules)/|(^|/)main\.js$' || true)
+          if [ -n "$bad" ]; then echo "Not allowed in this repo:"; echo "$bad"; exit 1; fi
+      - name: Reject Timed URLs
+        run: |
+          if git grep -nEi 'foundryvtt\.com/[^ ]*(releases|download)[^ ]*\?' -- . ':!.github'; then
+            echo "Looks like a Foundry download link. Never commit one."; exit 1
+          fi
+
+  shellcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck ct/*.sh install/*.sh

@@ -1,0 +1,12 @@
+# Foundry VTT is licensed software: never commit it, in any form.
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.zst
+foundryvtt/
+FoundryVTT*/
+resources/
+node_modules/
+
+.DS_Store
