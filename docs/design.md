@@ -20,8 +20,19 @@ what the in-container `update` command fetches. That one line is the only change
 the script is ever contributed upstream (plus their JSON metadata).
 
 Using the engine gets container creation, storage/network prompts, the `update` entrypoint
-and `setup_nodejs` for free, at the cost of running the engine's current code as root (the
-same trade every community-scripts user makes).
+and `setup_nodejs` for free, at the cost of running the engine's code as root.
+
+**Pinned engine.** `ct/foundryvtt.sh` sets `COMMUNITY_SCRIPTS_CORE_URL` to a specific
+`community-scripts/core` commit, not `main`; the in-container `update` command inherits the
+same pin. To bump it: run a fresh install and an `update` on a throwaway CT with the new
+commit (`COMMUNITY_SCRIPTS_CORE_URL=https://raw.githubusercontent.com/community-scripts/core/<sha>`),
+then change the default in a PR that names the tested commit.
+
+**Attribution.** The engine brands each container as an official community-scripts script
+(Proxmox notes with their logo and donate badge, a `community-script` tag, "Provided by:
+community-scripts ORG" in the login banner). Right after `description`, the CT script
+replaces all three with foundry-ops, so problems are reported here and not to them. Their
+banner lookup for an unknown app also prints harmless `curl: (22) ... 404` lines.
 
 ## Timed URL lifetime
 
