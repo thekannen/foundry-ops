@@ -66,7 +66,7 @@ fetch_foundry() {
 }
 
 # Unzip $1 into $2 and find the app inside. Sets FVTT_ROOT (directory to install),
-# FVTT_GEN (major version) and FVTT_BUILD.
+# FVTT_GEN (major version), FVTT_BUILD and FVTT_NODE (Node.js major to run it on).
 stage_foundry() {
   local zip="$1" staging="$2" rel pkg entries
   rm -rf "$staging"
@@ -103,11 +103,16 @@ stage_foundry() {
   fi
   FVTT_GEN="$(jq -r '.release.generation // (.version | split(".")[0]) // empty' "$pkg")"
   FVTT_BUILD="$(jq -r '.release.build // (.version | split(".")[1]) // empty' "$pkg")"
+  # v14 packages name their Node major (release.node_version); older ones use the table.
+  FVTT_NODE="$(jq -r '.release.node_version // empty' "$pkg")"
+  if [[ ! "$FVTT_NODE" =~ ^[0-9]+$ ]]; then
+    FVTT_NODE="$(node_for_generation "$FVTT_GEN")"
+  fi
   msg_ok "Found Foundry VTT ${FVTT_GEN}.${FVTT_BUILD}"
 }
 
-# Node major for a Foundry generation (wiki compatibility table: v14 needs 24,
-# earlier versions do not run on 24).
+# Node major for a Foundry generation when package.json does not name one (wiki
+# compatibility table: v14 needs 24, earlier versions do not run on 24).
 node_for_generation() {
   case "${1:-}" in
   '' | *[!0-9]*) echo 24 ;;
@@ -160,7 +165,7 @@ function update_script() {
   fetch_foundry "$ZIP_FILE"
   stage_foundry "$ZIP_FILE" "$STAGING_DIR" || exit 1
 
-  NODE_VERSION="$(node_for_generation "$FVTT_GEN")" setup_nodejs
+  NODE_VERSION="$FVTT_NODE" setup_nodejs
 
   msg_info "Stopping Service"
   systemctl stop foundryvtt

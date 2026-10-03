@@ -34,8 +34,9 @@ The script creates the container (defaults: Debian 13, unprivileged, 2 cores, 4 
 2. Asks for the **Timed URL** (foundryvtt.com → Purchased Licenses → **Node.js** package →
    Timed URL). It downloads immediately; the URL is valid for 5 minutes. A path to a zip
    already inside the container works too.
-3. Reads the Foundry version from the zip and installs the matching Node.js (v14: 24,
-   v13: 22, older: 20).
+3. Reads the Foundry version from the zip and installs the Node.js it asks for
+   (`release.node_version`; otherwise v14: 24, v13: 22, older: 20). The Linux package works
+   too; the Node.js package leaves out the desktop (Electron) files.
 4. Installs to `/opt/foundryvtt/app`, user data to `/var/lib/foundryvtt`, and runs it as the
    `foundry` system user under `foundryvtt.service`.
 5. Sets `options.json`: UPnP off; behind a proxy, `proxySSL`, `proxyPort: 443` and your

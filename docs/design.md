@@ -34,17 +34,30 @@ after the download because the right Node major depends on the Foundry version i
 | Wiki | Here | Why |
 |---|---|---|
 | pm2 under a sudo user | systemd unit, `foundry` system user without sudo | Container-native; nothing needs sudo at run time |
-| nvm | NodeSource via `setup_nodejs`, version chosen from the zip | Survives updates; v14 needs 24, earlier versions break on 24 |
+| nvm | NodeSource via `setup_nodejs`, version read from the zip's `package.json` | Survives updates; v14 needs 24, earlier versions break on 24 |
 | `~/foundry`, `~/foundryuserdata` | `/opt/foundryvtt/app`, `/var/lib/foundryvtt` | Community-scripts convention; data path is easy to mount separately |
 | Caddy in the same host | Left to the user's proxy (roadmap: optional Caddy) | Homelabs usually already run NPM/Caddy/Traefik |
 | Fixed `main.js` path | Resolved at start by `run.sh` | It moved between v12, v13 and v14.365 |
 | UPnP default (on) | Off | A container should not open router ports |
 
+## Package layouts (verified)
+
+FoundryVTT-Linux-14.368.zip, checked 2026-10-03:
+
+- Flat: no wrapper folder. Electron files (`foundryvtt`, `*.pak`, `locales/`) sit beside
+  `resources/app/`, which holds `main.js` and `package.json`.
+- `package.json` has `release.generation` (14), `release.build` (368) and
+  `release.node_version` (24), and `engines.node` `>=24.13.1 <25.0.0`. The scripts use
+  `release.node_version` when present and the generation table otherwise.
+- The Linux package runs under plain Node.js (`resources/app/main.js`), so either package
+  works; the Node.js one leaves out the Electron files (the Linux zip is 563 MB unpacked).
+
+Not yet checked: the v14 Node.js package, and v12/v13 packages (the table and the
+`version` fallback cover them).
+
 ## Open questions
 
-- Confirm `package.json` → `release.generation` / `release.build` on v12, v13 and v14 Node
-  packages (falls back to `version`).
 - Does Foundry's in-app updater keep working under `run.sh` across a `main.js` move? `run.sh`
-  is written so it should.
+  is written so it should; needs a real update to confirm.
 - Name: "Foundry" is part of Foundry Gaming's marks. Check their guidelines on community
   project names before going public.
